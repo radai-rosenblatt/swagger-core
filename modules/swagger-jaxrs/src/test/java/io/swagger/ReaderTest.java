@@ -24,6 +24,7 @@ import io.swagger.resources.ClassPathSubResource;
 import io.swagger.resources.DescendantResource;
 import io.swagger.resources.IndirectImplicitParamsImpl;
 import io.swagger.resources.MyClass;
+import io.swagger.resources.MyOtherClass;
 import io.swagger.resources.NoConsumesProducesResource;
 import io.swagger.resources.Resource1970;
 import io.swagger.resources.ResourceWithAnnotationsOnlyInInterfaceImpl;
@@ -120,8 +121,8 @@ public class ReaderTest {
         assertEquals(getPut(swagger, "/{id}").getProduces().get(0), TEXT_PLAIN);
         assertEquals(getPut(swagger, "/{id}/value").getConsumes().get(0), APPLICATION_XML);
         assertEquals(getPut(swagger, "/{id}/value").getProduces().get(0), TEXT_PLAIN);
-        assertEquals(getPut(swagger, "/split").getProduces(), Arrays.asList("image/jpeg",  "image/gif", "image/png"));
-        assertEquals(getPut(swagger, "/split").getConsumes(), Arrays.asList("image/jpeg",  "image/gif", "image/png"));
+        assertEquals(getPut(swagger, "/split").getProduces(), Arrays.asList("image/jpeg", "image/gif", "image/png"));
+        assertEquals(getPut(swagger, "/split").getConsumes(), Arrays.asList("image/jpeg", "image/gif", "image/png"));
     }
 
     @Test(description = "scan multiple consumes and produces values with rs class level annotations")
@@ -302,11 +303,11 @@ public class ReaderTest {
     }
 
     @Test(description = "it should scan parameters from base resource class")
-    public void scanParametersFromBaseResource(){
+    public void scanParametersFromBaseResource() {
         Swagger swagger = getSwagger(BookResource.class);
         assertNotNull(swagger);
 
-        List<Parameter> parameters =  getGet(swagger, "/{id}/v1/books/{name}").getParameters();
+        List<Parameter> parameters = getGet(swagger, "/{id}/v1/books/{name}").getParameters();
         assertEquals(parameters.size(), 4);
 
         Parameter description = parameters.get(0);
@@ -331,7 +332,7 @@ public class ReaderTest {
     }
 
     @Test(description = "it should scan parameters with Swagger and JSR-303 bean validation annotations")
-    public void scanBeanValidation(){
+    public void scanBeanValidation() {
 
         Swagger swagger = getSwagger(ResourceWithValidation.class);
         assertNotNull(swagger);
@@ -423,7 +424,7 @@ public class ReaderTest {
         Swagger swagger = getSwagger(Resource1970.class);
         assertNotNull(swagger);
 
-        PathParameter parameter = (PathParameter)swagger.getPath("/v1/{param1}").getGet().getParameters().get(0);
+        PathParameter parameter = (PathParameter) swagger.getPath("/v1/{param1}").getGet().getParameters().get(0);
         assertEquals(parameter.getType(), "number");
     }
 
@@ -456,50 +457,29 @@ public class ReaderTest {
     }
 
     @Test(description = "Resolve Model with XML Properties starting with is prefix per #2635")
-    public void testModelResolverXMLPropertiesName() throws Exception{
+    public void testModelResolverXMLPropertiesName() {
+        final MyClass myClass = new MyClass();
+        myClass.populate("isotonicDrink value", "softDrink value",
+                "isoDrink value");
 
-        MyClass myClass = new MyClass();
-        myClass.populate("isotonicDrink value", "softDrink value");
-
-        // reproduce issue #2635
         Json.mapper().registerModule(new JaxbAnnotationModule());
-        Map<String, Model> schemas = ModelConverters.getInstance().read(MyClass.class);
-        assertNull(schemas.get("MyClass").getProperties().get("isotonicDrink")); // this fails, while it should pass
-        assertNotNull(schemas.get("MyClass").getProperties().get("beerDrink")); // this fails, while it should pass
 
-        // TODO
-        /*
-            1. also update test for 2.0 branch
-            2. at least support renaming in these cases via JsonProperty, by adding the following to line 336 in model resolver
-                JsonProperty jsonPropertyAnn = propDef.getPrimaryMember().getAnnotation(JsonProperty.class);
-                if (jsonPropertyAnn == null || !jsonPropertyAnn.value().equals(propName)) {
-                    ...
-                }
-            3. add tests for all cases (with and without JsonProperty, ApiModelProperty etc)
-            4. Repeat points 2,3 for 2.0 branch
-            5. see also and add a test for other issue mentioned in #2635
-            6. spend limited effort to see if we can modify logic in resolver somehow to handle differently
-                (maybe check also jackson options, etc), but consider ModelConvertTest.maintainPropertyNames
-            7a. if not solvable, push PR for master and 2.0 and tell to use JsonProperty or ApiModelProperty or equivalent @Schema in 2.0
-            7b. if solvable, push changes and tests
+        final Map<String, Model> schemas = ModelConverters.getInstance().read(MyClass.class);
+        assertNull(schemas.get("MyClass").getProperties().get("isotonicDrink"));
+        assertNotNull(schemas.get("MyClass").getProperties().get("beerDrink"));
+        assertNotNull(schemas.get("MyClass").getProperties().get("saltDrink"));
+    }
 
+    @Test(description = "Maintain Property names per #2635")
+    public void testMaintainPropertyNames() {
+        final MyOtherClass myOtherClass = new MyOtherClass();
+        myOtherClass.populate("myPropertyName value");
 
-            some related tickets and stuff:
-                  https://github.com/swagger-api/swagger-core/issues/415
-                  https://github.com/swagger-api/swagger-core/issues/2332
-                  https://github.com/swagger-api/swagger-core/issues/2635
+        Json.mapper().registerModule(new JaxbAnnotationModule());
 
-                  Tickets JAxb:
-                  https://github.com/swagger-api/swagger-core/issues/960
+        final Map<String, Model> schemas = ModelConverters.getInstance().read(MyOtherClass.class);
+        assertNotNull(schemas.get("MyOtherClass").getProperties().get("MyPrOperTyName"));
 
-                  Commits:
-                  https://github.com/swagger-api/swagger-core/commit/d183d8cd0f735fc18f5a50dcd52e2076da69b5df
-                  https://github.com/swagger-api/swagger-core/commit/0706c16eb8eaa8b348df895269affe73575e9578
-
-                  Jackson:
-                  https://stackoverflow.com/questions/32270422/jackson-renames-primitive-boolean-field-by-removing-is/35088196
-                  https://github.com/FasterXML/jackson-module-kotlin/issues/80
-         */
     }
 
     private Swagger getSwagger(Class<?> cls) {
