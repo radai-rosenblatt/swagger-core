@@ -126,17 +126,21 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
         final BeanDescription beanDesc = _mapper.getSerializationConfig().introspect(type);
 
         String name = annotatedType.getName();
+        LOGGER.debug("resolve - annotatedType.getName(): {}", annotatedType.getName());
         if (StringUtils.isBlank(name)) {
             // allow override of name from annotation
             if (!annotatedType.isSkipSchemaName() && resolvedSchemaAnnotation != null && !resolvedSchemaAnnotation.name().isEmpty()) {
+                LOGGER.debug("resolve - resolvedSchemaAnnotation.name(): {}", resolvedSchemaAnnotation.name());
                 name = resolvedSchemaAnnotation.name();
             }
             if (StringUtils.isBlank(name) && !ReflectionUtils.isSystemType(type)) {
                 name = _typeName(type, beanDesc);
+                LOGGER.debug("resolve - _typeName: {}", name);
             }
         }
 
         name = decorateModelName(annotatedType, name);
+        LOGGER.debug("resolve - decorateModelName: {}", name);
 
         // if we have a ref we don't consider anything else
         if (resolvedSchemaAnnotation != null &&
@@ -328,12 +332,14 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
         boolean isComposedSchema = composedSchemaReferencedClasses != null;
 
         if (type.isContainerType()) {
+            LOGGER.debug("resolve - isContainerType: {}", true);
             JavaType keyType = type.getKeyType();
             JavaType valueType = type.getContentType();
             String pName = null;
             if (valueType != null) {
                 BeanDescription valueTypeBeanDesc = _mapper.getSerializationConfig().introspect(valueType);
                 pName = _typeName(valueType, valueTypeBeanDesc);
+                LOGGER.debug("resolve - isContainerType _typeName: {}", pName);
             }
             Annotation[] schemaAnnotations = null;
             if (resolvedSchemaAnnotation != null) {
@@ -369,6 +375,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 model = mapModel;
                 //return model;
             } else if (valueType != null) {
+                LOGGER.debug("resolve - isContainerType Coll: {}", true);
                 if (ReflectionUtils.isSystemType(type) && !annotatedType.isSchemaProperty() && !annotatedType.isResolveAsRef()) {
                     context.resolve(new AnnotatedType().type(valueType).jsonViewAnnotation(annotatedType.getJsonViewAnnotation()));
                     return null;
@@ -385,14 +392,17 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 if (items == null) {
                     return null;
                 }
+                LOGGER.debug("resolve - isContainerType Coll - items: {}", items.getName());
                 if (annotatedType.isSchemaProperty() && annotatedType.getCtxAnnotations() != null && annotatedType.getCtxAnnotations().length > 0) {
                     for (Annotation annotation : annotatedType.getCtxAnnotations()) {
                         if (annotation instanceof XmlElement) {
+                            LOGGER.debug("resolve - isContainerType Coll - XmlElement items: {}", items.getName());
                             XmlElement xmlElement = (XmlElement) annotation;
                             if (xmlElement != null && xmlElement.name() != null && !"".equals(xmlElement.name()) && !"##default".equals(xmlElement.name())) {
                                 XML xml = items.getXml() != null ? items.getXml() : new XML();
                                 xml.setName(xmlElement.name());
                                 items.setXml(xml);
+                                LOGGER.debug("resolve - isContainerType Coll - XmlElement items 2: {}", items.getName());
                             }
                         }
                     }
@@ -400,6 +410,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 if (StringUtils.isNotBlank(items.getName())) {
                     pName = items.getName();
                 }
+                LOGGER.debug("resolve - isContainerType Coll -  pName: {}", pName);
                 if ("object".equals(items.getType()) && pName != null) {
                     // create a reference for the items
                     if (context.getDefinedModels().containsKey(pName)) {
@@ -414,6 +425,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 if (_isSetType(type.getRawClass())) {
                     arrayModel.setUniqueItems(true);
                 }
+                LOGGER.debug("resolve - isContainerType Coll -  name: {}", name);
                 arrayModel.name(name);
                 model = arrayModel;
             } else {
@@ -456,6 +468,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
         }
 
         resolveSchemaMembers(model, annotatedType);
+        LOGGER.debug("resolve - resolveSchemaMembers -  name: {}", model.getName());
 
         final XmlAccessorType xmlAccessorTypeAnnotation = beanDesc.getClassAnnotations().get(XmlAccessorType.class);
 
@@ -475,6 +488,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
         for (BeanPropertyDefinition propDef : properties) {
             Schema property = null;
             String propName = propDef.getName();
+            LOGGER.info("propDef.getName() propName: {}", propName);
             Annotation[] annotations = null;
 
             AnnotatedMember member = propDef.getPrimaryMember();
@@ -575,12 +589,14 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 property = context.resolve(aType);
 
                 if (property != null) {
+                    LOGGER.debug("resolve - resolved Property -  name: {}", property.getName());
                     if (property.get$ref() == null) {
                         if (!"object".equals(property.getType())) {
                             try {
                                 String cloneName = property.getName();
                                 property = Json.mapper().readValue(Json.pretty(property), Schema.class);
                                 property.setName(cloneName);
+                                LOGGER.debug("resolve - resolved Property ref null -  name: {}", property.getName());
                             } catch (IOException e) {
                                 LOGGER.error("Could not clone property, e");
                             }
@@ -614,8 +630,10 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                         if ("object".equals(property.getType())) {
                             // create a reference for the property
                             String pName = _typeName(propType, propBeanDesc);
+                            LOGGER.info("object prop ttype: _typeName pName: {}", pName);
                             if (StringUtils.isNotBlank(property.getName())) {
                                 pName = property.getName();
+                                LOGGER.info("object prop ttype: property.getName() pName: {}", pName);
                             }
 
                             if (context.getDefinedModels().containsKey(pName)) {
@@ -625,10 +643,11 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                             property = new Schema().$ref(StringUtils.isNotEmpty(property.get$ref()) ? property.get$ref() : property.getName());
                         }
                     }
+                    LOGGER.info("property.setName propName: {}", propName);
                     property.setName(propName);
                     JAXBAnnotationsHelper.apply(propBeanDesc.getClassInfo(), annotations, property);
                     applyBeanValidatorAnnotations(property, annotations, model);
-
+                    LOGGER.info("last prop: Name: {}", property.getName());
                     props.add(property);
                 }
             }
@@ -771,6 +790,7 @@ public class ModelResolver extends AbstractModelConverter implements ModelConver
                 }
             }
         }
+        if (model != null) LOGGER.info("resolve returned model name: {}", model.getName());
         return model;
     }
 
